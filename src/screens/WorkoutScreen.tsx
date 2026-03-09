@@ -22,12 +22,17 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../constants/theme';
 import { Set, WorkoutExercise, Workout, Exercise, RootTabParamList, QuickStartTemplate } from '../types';
 import { WorkoutService } from '../services/WorkoutService';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
+import { RestTimerModal } from '../components/RestTimerModal';
 import { generateId } from '../utils/helpers';
 import { EXERCISE_CATALOG } from '../data/exerciseCatalog';
+
+const REST_DURATION_KEY = '@workout_tracker:rest_duration';
 
 type WorkoutNavProp = BottomTabNavigationProp<RootTabParamList, 'Workout'>;
 type WorkoutRouteProp = RouteProp<RootTabParamList, 'Workout'>;
@@ -260,6 +265,8 @@ export const WorkoutScreen: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [saving, setSaving]     = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [restVisible, setRestVisible]   = useState(false);
+  const [restDuration, setRestDuration] = useState(90);
 
   const scrollRef          = useRef<ScrollView>(null);
   const timerRef           = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -286,6 +293,14 @@ export const WorkoutScreen: React.FC = () => {
     }
     prevLen.current = exercises.length;
   }, [exercises.length, isRunning]);
+
+  // ── Persisted rest duration ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    AsyncStorage.getItem(REST_DURATION_KEY)
+      .then((val) => { if (val) setRestDuration(parseInt(val, 10)); })
+      .catch(() => {});
+  }, []);
 
   // ── Template ─────────────────────────────────────────────────────────────────
 
@@ -366,6 +381,10 @@ export const WorkoutScreen: React.FC = () => {
   );
 
   const toggleSet = useCallback((exIdx: number, setId: string) => {
+    // Check BEFORE the update whether we are completing (not un-completing) a set
+    const currentSet = exercisesRef.current[exIdx]?.sets.find((s) => s.id === setId);
+    const isCompleting = currentSet && !currentSet.completed;
+
     setExercises((prev) =>
       prev.map((we, i) =>
         i === exIdx
@@ -373,6 +392,16 @@ export const WorkoutScreen: React.FC = () => {
           : we
       )
     );
+
+    // Auto-start rest timer only when marking a set as done
+    if (isCompleting) {
+      setRestVisible(true);
+    }
+  }, []);
+
+  const handleRestDurationChange = useCallback((seconds: number) => {
+    setRestDuration(seconds);
+    AsyncStorage.setItem(REST_DURATION_KEY, String(seconds)).catch(() => {});
   }, []);
 
   // ── Save / Discard ───────────────────────────────────────────────────────────
@@ -529,6 +558,13 @@ export const WorkoutScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <RestTimerModal
+        visible={restVisible}
+        preferredDuration={restDuration}
+        onDurationChange={handleRestDurationChange}
+        onDismiss={() => setRestVisible(false)}
+      />
 
       <ExercisePickerModal
         visible={showPicker}
