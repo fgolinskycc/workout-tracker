@@ -76,3 +76,9 @@ export type RootTabParamList = {
   History: undefined;
   Progress: undefined;
 };
+
+/** Root stack — sits above the tab navigator so detail screens push on top. */
+export type RootStackParamList = {
+  Tabs: undefined;
+  WorkoutDetail: { workoutId: string };
+};

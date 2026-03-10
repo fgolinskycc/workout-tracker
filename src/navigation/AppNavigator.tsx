@@ -1,15 +1,18 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { HomeScreen } from '../screens/HomeScreen';
 import { WorkoutScreen } from '../screens/WorkoutScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
+import { WorkoutDetailScreen } from '../screens/WorkoutDetailScreen';
 import { COLORS, FONT_SIZES } from '../constants/theme';
-import { RootTabParamList } from '../types';
+import { RootTabParamList, RootStackParamList } from '../types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -23,7 +26,7 @@ const TAB_ICONS: Record<
   Progress: { active: 'trending-up', inactive: 'trending-up-outline' },
 };
 
-export const AppNavigator: React.FC = () => (
+const TabNavigator: React.FC = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
       headerStyle: {
@@ -47,10 +50,7 @@ export const AppNavigator: React.FC = () => (
         borderTopWidth: 1,
         paddingTop: 4,
       },
-      tabBarLabelStyle: {
-        fontSize: FONT_SIZES.xs,
-        fontWeight: '600',
-      },
+      tabBarLabelStyle: { fontSize: FONT_SIZES.xs, fontWeight: '600' },
       tabBarHideOnKeyboard: true,
       tabBarIcon: ({ focused, color, size }) => {
         const icons = TAB_ICONS[route.name as keyof RootTabParamList];
@@ -59,25 +59,16 @@ export const AppNavigator: React.FC = () => (
       },
     })}
   >
-    <Tab.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{ title: 'Dashboard' }}
-    />
-    <Tab.Screen
-      name="Workout"
-      component={WorkoutScreen}
-      options={{ title: 'Log Workout', headerShown: false }}
-    />
-    <Tab.Screen
-      name="History"
-      component={HistoryScreen}
-      options={{ title: 'History' }}
-    />
-    <Tab.Screen
-      name="Progress"
-      component={ProgressScreen}
-      options={{ title: 'Progress' }}
-    />
+    <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Dashboard' }} />
+    <Tab.Screen name="Workout" component={WorkoutScreen} options={{ title: 'Log Workout', headerShown: false }} />
+    <Tab.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
+    <Tab.Screen name="Progress" component={ProgressScreen} options={{ title: 'Progress' }} />
   </Tab.Navigator>
+);
+
+export const AppNavigator: React.FC = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Tabs" component={TabNavigator} />
+    <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
+  </Stack.Navigator>
 );

@@ -8,13 +8,14 @@ import { formatDate, formatDurationMins, calcWorkoutVolume } from '../utils/help
 interface Props {
   workout: Workout;
   onDelete?: (id: string) => void;
+  onPress?: () => void;
 }
 
-export const WorkoutCard: React.FC<Props> = ({ workout, onDelete }) => {
+export const WorkoutCard: React.FC<Props> = ({ workout, onDelete, onPress }) => {
   const volume = calcWorkoutVolume(workout.exercises);
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
       <View style={styles.accentBar} />
       <View style={styles.body}>
         <View style={styles.row}>
@@ -72,7 +73,7 @@ export const WorkoutCard: React.FC<Props> = ({ workout, onDelete }) => {
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
