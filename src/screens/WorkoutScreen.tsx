@@ -74,7 +74,7 @@ interface SetRowProps {
   set: Set;
   onWeightChange: (val: string) => void;
   onRepsChange: (val: string) => void;
-  onToggle: () => void;
+  onToggle: (isCompleting: boolean) => void;
 }
 
 const SetRow = memo<SetRowProps>(({ index, set, onWeightChange, onRepsChange, onToggle }) => {
@@ -99,10 +99,12 @@ const SetRow = memo<SetRowProps>(({ index, set, onWeightChange, onRepsChange, on
   }, []);
 
   const handleToggle = async () => {
-    if (!set.completed) {
+    // Capture synchronously before any async work
+    const isCompleting = !set.completed;
+    if (isCompleting) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    onToggle();
+    onToggle(isCompleting);
   };
 
   return (
@@ -170,7 +172,7 @@ interface ExerciseCardProps {
   onAddSet: (idx: number) => void;
   onRemoveLastSet: (idx: number) => void;
   onUpdateSet: (exIdx: number, setId: string, field: 'weight' | 'reps', val: string) => void;
-  onToggleSet: (exIdx: number, setId: string) => void;
+  onToggleSet: (exIdx: number, setId: string, isCompleting: boolean) => void;
 }
 
 const ExerciseCard = memo<ExerciseCardProps>(({
@@ -228,7 +230,7 @@ const ExerciseCard = memo<ExerciseCardProps>(({
           set={set}
           onWeightChange={(v) => onUpdateSet(exIdx, set.id, 'weight', v)}
           onRepsChange={(v) => onUpdateSet(exIdx, set.id, 'reps', v)}
-          onToggle={() => onToggleSet(exIdx, set.id)}
+          onToggle={(isCompleting) => onToggleSet(exIdx, set.id, isCompleting)}
         />
       ))}
 
@@ -380,11 +382,7 @@ export const WorkoutScreen: React.FC = () => {
     []
   );
 
-  const toggleSet = useCallback((exIdx: number, setId: string) => {
-    // Check BEFORE the update whether we are completing (not un-completing) a set
-    const currentSet = exercisesRef.current[exIdx]?.sets.find((s) => s.id === setId);
-    const isCompleting = currentSet && !currentSet.completed;
-
+  const toggleSet = useCallback((exIdx: number, setId: string, isCompleting: boolean) => {
     setExercises((prev) =>
       prev.map((we, i) =>
         i === exIdx
@@ -393,7 +391,7 @@ export const WorkoutScreen: React.FC = () => {
       )
     );
 
-    // Auto-start rest timer only when marking a set as done
+    // isCompleting determined by SetRow at click-time (synchronous, before any await)
     if (isCompleting) {
       setRestVisible(true);
     }
