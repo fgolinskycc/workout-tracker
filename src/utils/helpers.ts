@@ -23,13 +23,17 @@ export const formatDurationMins = (minutes: number): string => {
 
 // ─── Date formatting ───────────────────────────────────────────────────────────
 
-/** Format ISO date string → "Mon, Jan 1" */
-export const formatDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+const DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Format ISO date string → "Mon, Jan 6"
+ *  Uses local-timezone getDay/getMonth/getDate to avoid Hermes Intl bugs.
+ */
+export const formatDate = (iso: string): string => {
+  const d = new Date(iso);
+  return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+};
 
 // ─── Volume calculation ────────────────────────────────────────────────────────
 
