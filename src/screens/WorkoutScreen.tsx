@@ -275,13 +275,20 @@ export const WorkoutScreen: React.FC = () => {
   const prevLen            = useRef(0);
   const exercisesRef       = useRef(exercises);
   const appliedTemplateRef = useRef<string | null>(null);
+  const startTimeRef       = useRef<number | null>(null);
   exercisesRef.current = exercises;
 
   // ── Timer ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (isRunning) {
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+      // Use wall-clock start time so background periods don't cause drift
+      if (startTimeRef.current === null) {
+        startTimeRef.current = Date.now();
+      }
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000));
+      }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -412,6 +419,7 @@ export const WorkoutScreen: React.FC = () => {
     setSaving(false);
     prevLen.current = 0;
     appliedTemplateRef.current = null;
+    startTimeRef.current = null;
   }, []);
 
   const confirmDiscard = useCallback(() => {
@@ -431,7 +439,9 @@ export const WorkoutScreen: React.FC = () => {
       id: generateId(),
       title: title.trim() || 'Workout',
       date: new Date().toISOString(),
-      duration: Math.max(1, Math.round(elapsed / 60)),
+      duration: Math.max(1, Math.round(
+        (startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : elapsed) / 60
+      )),
       exercises,
     };
 
