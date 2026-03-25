@@ -34,6 +34,9 @@
         "projectId": "bd3bd891-b486-4034-a18d-29918c1fc0d1"
       }
     },
-    "owner": "fgolinsky"
+    "owner": "fgolinsky",
+    "updates": {
+      "url": "https://u.expo.dev/bd3bd891-b486-4034-a18d-29918c1fc0d1"
+    }
   }
 }

@@ -22,12 +22,17 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../constants/theme';
 import { Set, WorkoutExercise, Workout, Exercise, RootTabParamList, QuickStartTemplate } from '../types';
 import { WorkoutService } from '../services/WorkoutService';
 import { ExercisePickerModal } from '../components/ExercisePickerModal';
+import { RestTimerModal } from '../components/RestTimerModal';
 import { generateId } from '../utils/helpers';
 import { EXERCISE_CATALOG } from '../data/exerciseCatalog';
+
+const REST_DURATION_KEY = '@workout_tracker:rest_duration';
 
 type WorkoutNavProp = BottomTabNavigationProp<RootTabParamList, 'Workout'>;
 type WorkoutRouteProp = RouteProp<RootTabParamList, 'Workout'>;
@@ -69,7 +74,7 @@ interface SetRowProps {
   set: Set;
   onWeightChange: (val: string) => void;
   onRepsChange: (val: string) => void;
-  onToggle: () => void;
+  onToggle: (isCompleting: boolean) => void;
 }
 
 const SetRow = memo<SetRowProps>(({ index, set, onWeightChange, onRepsChange, onToggle }) => {
@@ -94,10 +99,12 @@ const SetRow = memo<SetRowProps>(({ index, set, onWeightChange, onRepsChange, on
   }, []);
 
   const handleToggle = async () => {
-    if (!set.completed) {
+    // Capture synchronously before any async work
+    const isCompleting = !set.completed;
+    if (isCompleting) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    onToggle();
+    onToggle(isCompleting);
   };
 
   return (
@@ -165,7 +172,7 @@ interface ExerciseCardProps {
   onAddSet: (idx: number) => void;
   onRemoveLastSet: (idx: number) => void;
   onUpdateSet: (exIdx: number, setId: string, field: 'weight' | 'reps', val: string) => void;
-  onToggleSet: (exIdx: number, setId: string) => void;
+  onToggleSet: (exIdx: number, setId: string, isCompleting: boolean) => void;
 }
 
 const ExerciseCard = memo<ExerciseCardProps>(({
@@ -223,7 +230,7 @@ const ExerciseCard = memo<ExerciseCardProps>(({
           set={set}
           onWeightChange={(v) => onUpdateSet(exIdx, set.id, 'weight', v)}
           onRepsChange={(v) => onUpdateSet(exIdx, set.id, 'reps', v)}
-          onToggle={() => onToggleSet(exIdx, set.id)}
+          onToggle={(isCompleting) => onToggleSet(exIdx, set.id, isCompleting)}
         />
       ))}
 
@@ -260,19 +267,28 @@ export const WorkoutScreen: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [saving, setSaving]     = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [restVisible, setRestVisible]   = useState(false);
+  const [restDuration, setRestDuration] = useState(90);
 
   const scrollRef          = useRef<ScrollView>(null);
   const timerRef           = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevLen            = useRef(0);
   const exercisesRef       = useRef(exercises);
   const appliedTemplateRef = useRef<string | null>(null);
+  const startTimeRef       = useRef<number | null>(null);
   exercisesRef.current = exercises;
 
   // ── Timer ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (isRunning) {
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+      // Use wall-clock start time so background periods don't cause drift
+      if (startTimeRef.current === null) {
+        startTimeRef.current = Date.now();
+      }
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000));
+      }, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -286,6 +302,14 @@ export const WorkoutScreen: React.FC = () => {
     }
     prevLen.current = exercises.length;
   }, [exercises.length, isRunning]);
+
+  // ── Persisted rest duration ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    AsyncStorage.getItem(REST_DURATION_KEY)
+      .then((val) => { if (val) setRestDuration(parseInt(val, 10)); })
+      .catch(() => {});
+  }, []);
 
   // ── Template ─────────────────────────────────────────────────────────────────
 
@@ -365,7 +389,7 @@ export const WorkoutScreen: React.FC = () => {
     []
   );
 
-  const toggleSet = useCallback((exIdx: number, setId: string) => {
+  const toggleSet = useCallback((exIdx: number, setId: string, isCompleting: boolean) => {
     setExercises((prev) =>
       prev.map((we, i) =>
         i === exIdx
@@ -373,6 +397,16 @@ export const WorkoutScreen: React.FC = () => {
           : we
       )
     );
+
+    // isCompleting determined by SetRow at click-time (synchronous, before any await)
+    if (isCompleting) {
+      setRestVisible(true);
+    }
+  }, []);
+
+  const handleRestDurationChange = useCallback((seconds: number) => {
+    setRestDuration(seconds);
+    AsyncStorage.setItem(REST_DURATION_KEY, String(seconds)).catch(() => {});
   }, []);
 
   // ── Save / Discard ───────────────────────────────────────────────────────────
@@ -385,6 +419,7 @@ export const WorkoutScreen: React.FC = () => {
     setSaving(false);
     prevLen.current = 0;
     appliedTemplateRef.current = null;
+    startTimeRef.current = null;
   }, []);
 
   const confirmDiscard = useCallback(() => {
@@ -404,7 +439,9 @@ export const WorkoutScreen: React.FC = () => {
       id: generateId(),
       title: title.trim() || 'Workout',
       date: new Date().toISOString(),
-      duration: Math.max(1, Math.round(elapsed / 60)),
+      duration: Math.max(1, Math.round(
+        (startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : elapsed) / 60
+      )),
       exercises,
     };
 
@@ -529,6 +566,13 @@ export const WorkoutScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      <RestTimerModal
+        visible={restVisible}
+        preferredDuration={restDuration}
+        onDurationChange={handleRestDurationChange}
+        onDismiss={() => setRestVisible(false)}
+      />
 
       <ExercisePickerModal
         visible={showPicker}

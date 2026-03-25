@@ -8,16 +8,25 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS, SPACING, FONT_SIZES } from '../constants/theme';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutCard } from '../components/WorkoutCard';
-import { Workout } from '../types';
+import { Workout, RootTabParamList, RootStackParamList } from '../types';
+
+type HistoryNavProp = CompositeNavigationProp<
+  BottomTabNavigationProp<RootTabParamList, 'History'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export const HistoryScreen: React.FC = () => {
   const { workouts, loading, deleteWorkout, refresh } = useWorkouts();
+  const navigation = useNavigation<HistoryNavProp>();
 
   useFocusEffect(
     useCallback(() => {
@@ -50,7 +59,11 @@ export const HistoryScreen: React.FC = () => {
   }
 
   const renderItem = ({ item }: { item: Workout }) => (
-    <WorkoutCard workout={item} onDelete={handleDelete} />
+    <WorkoutCard
+      workout={item}
+      onDelete={handleDelete}
+      onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item.id })}
+    />
   );
 
   return (
